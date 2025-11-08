@@ -5,7 +5,7 @@ app = FastAPI(name="multi-model-application")
 @app.get("/health")
 
 async def health_check():
-    return {"status" : "healthy"}
+    return {"status" : "website is healthy"}
 
 def main():
     print("Hello from multi-model-application!")
