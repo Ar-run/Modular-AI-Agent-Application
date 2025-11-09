@@ -5,6 +5,8 @@ from pydantic import BaseModel,Field
 from langchain_core.tools import tool
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 import os
 from config import GROQ_API_KEY,TAVILY_API_KEY,PINECONE_API_KEY
 from langchain_core.runnables import RunnableConfig
@@ -280,6 +282,65 @@ def answer_node(state: AgentState) -> AgentState:
     **state,
     "messages": state["messages"] + [AIMessage(content=ans)]
   }
+
+# Routing helpers
+def from_router(st: AgentState) -> Literal["rag", "web", "answer", "end"]:
+    return st["route"]
+
+def after_rag(st: AgentState) -> Literal["answer", "web"]:
+    return st["route"]
+
+def after_web(_) -> Literal["answer"]:
+    return "answer"
+
+# Node functions ends here
+
+# --- Build graph ---
+def build_agent():
+  """Builds and compiles the LangGraph agent."""
+  g = StateGraph(AgentState)
+  g.add_node("router", router_node)
+  g.add_node("rag_lookup", rag_node)
+  g.add_node("web_search", web_node)
+  g.add_node("answer", answer_node)
+
+  g.set_entry_point("router")
+    
+  g.add_conditional_edges(
+    "router",
+    from_router,
+    {
+      "rag": "rag_lookup",
+      "web": "web_search",
+      "answer": "answer",
+      "end": END
+    }
+  )
+    
+  g.add_conditional_edges(
+    "rag_lookup",
+    after_rag,
+    {
+      "answer": "answer",
+      "web": "web_search"
+    }
+  )
+    
+  g.add_conditional_edges(
+    "web_search",
+    after_web,
+    {
+      "answer": "answer"
+    }
+  )
+
+  # g.add_edge("web_search", "answer") commented as conditional edge is added above, uncomment if doesnt work
+  g.add_edge("answer", END)
+
+  agent = g.compile(checkpointer=MemorySaver())
+  return agent
+
+rag_agent = build_agent()
 
 
 
