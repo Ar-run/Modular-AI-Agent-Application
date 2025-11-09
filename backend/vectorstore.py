@@ -68,5 +68,5 @@ def add_document(text_content:str):
   # add documents to vector store
   vectorstore.add_documents(documents)
 
-  print("Successfully added chunks to Pinecone vector store.")
+  print(f"Successfully added {len(documents)} chunks to Pinecone vector index '{INDEX_NAME}'.")
 
